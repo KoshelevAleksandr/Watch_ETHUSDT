@@ -33,6 +33,7 @@ def lets_close_ws():
 
 
 def on_open(_wsa):
+    print('***Websocket connect***')
     data = dict(
         method='SUBSCRIBE',
         params=['btcusdt@aggTrade', 'ethusdt@aggTrade'],
