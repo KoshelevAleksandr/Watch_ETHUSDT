@@ -22,7 +22,7 @@ def check_time(time):
 
 def change_price_1hour(new_price_eth):
     price_change = (new_price_eth - prices_eth[0][1]) / prices_eth[0][1] * 100
-    if abs(price_change) >= 0.01:
+    if abs(price_change) >= 1:
         sign_change = '+' if price_change > 0 else ''
         print(f'За последние 60 минут цена изменилась на: {sign_change}{price_change}% ({prices_eth[0][1]} >>> {new_price_eth})')
 
