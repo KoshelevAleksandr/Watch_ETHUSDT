@@ -1,4 +1,3 @@
-import keyboard
 import websocket
 import json
 import datetime
@@ -21,32 +20,11 @@ def check_time(time):
     return check_one_hour < time_now
 
 
-def read_btc(new_price_btc):
-    global last_price_btc, correction_btc
-    if last_price_btc is None:
-        last_price_btc = new_price_btc
-    else:
-        correction_btc = round((new_price_btc - last_price_btc) / last_price_btc * 100, 4)
-        last_price_btc = new_price_btc
-
-
-def read_eth(time, new_price_eth):
-    global last_price_eth, correction_eth, prices_eth
-    if last_price_eth is None:
-        last_price_eth = new_price_eth
-    else:
-        correction_eth = round((new_price_eth - last_price_eth) / last_price_eth * 100, 5)
-        personal_correction = round(correction_eth - correction_btc, 3)
-        sign_correction = '+' if personal_correction > 0 else ''
-        print(f'Собственное движение цены ETH: {sign_correction}{personal_correction}%')
-        prices_eth.append([time, new_price_eth])
-        while check_time(prices_eth[0][0]):
-            prices_eth.pop(0)
-        # print(prices_eth[0])
-        price_change = round((new_price_eth - prices_eth[0]) / prices_eth[0] * 100, 3)
-        if price_change > 1:
-            print(f'За последние 60 минут цена изменилась на: {price_change}% ({prices_eth[0]} >>> {new_price_eth})')
-        last_price_eth = new_price_eth
+def change_price_1hour(new_price_eth):
+    price_change = (new_price_eth - prices_eth[0][1]) / prices_eth[0][1] * 100
+    if abs(price_change) >= 0.01:
+        sign_change = '+' if price_change > 0 else ''
+        print(f'За последние 60 минут цена изменилась на: {sign_change}{price_change}% ({prices_eth[0][1]} >>> {new_price_eth})')
 
 
 def lets_close_ws():
@@ -57,24 +35,39 @@ def lets_close_ws():
 def on_open(_wsa):
     data = dict(
         method='SUBSCRIBE',
-        params=['btcusdt@ticker', 'ethusdt@ticker'],
+        params=['btcusdt@aggTrade', 'ethusdt@aggTrade'],
         id=1)
     _wsa.send(json.dumps(data))
 
 
 def on_message(_wsa, data):
-
+    global last_price_eth, last_price_btc, correction_btc, correction_eth
     d_dict = json.loads(data)
     if d_dict['s'] == s_btc:
-        new_price_btc = float(d_dict['c'])
+        new_price_btc = float(d_dict['p'])
 
-        read_btc(new_price_btc)
+        if not (last_price_btc is None):
+            correction_btc = round((new_price_btc - last_price_btc) / last_price_btc * 100, 4)
+
+        last_price_btc = new_price_btc
 
     if d_dict['s'] == s_eth:
         time = d_dict['E']
-        new_price_eth = float(d_dict['c'])
+        new_price_eth = float(d_dict['p'])
 
-        read_eth(time, new_price_eth)
+        if not (last_price_eth is None) and not (correction_btc is None):
+            correction_eth = round((new_price_eth - last_price_eth) / last_price_eth * 100, 5)
+            personal_correction = round(correction_eth - correction_btc, 3)
+            sign_correction = '+' if personal_correction > 0 else ''
+            print(f'Собственное движение цены ETH: {sign_correction}{personal_correction}%')
+            prices_eth.append([time, new_price_eth])
+
+        last_price_eth = new_price_eth
+
+        while check_time(prices_eth[0][0]):
+            prices_eth.pop(0)
+
+        change_price_1hour(new_price_eth)
 
     if lets_close_ws():
         _wsa.close()
